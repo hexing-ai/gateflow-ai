@@ -1,0 +1,11 @@
+.venv/
+.env*
+!.env.example
+.local/
+__pycache__/
+.pytest_cache/
+node_modules/
+web/dist/
+.vefaas/
+*.log
+.DS_Store

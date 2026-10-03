@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gateflow
+      POSTGRES_USER: gateflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+  api:
+    build: .
+    env_file: .env
+    environment:
+      APP_MODE: full
+      DATABASE_URL: postgresql+psycopg://gateflow:${POSTGRES_PASSWORD}@db:5432/gateflow
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: unless-stopped
+    init: true
+  worker:
+    build: .
+    command: ["python", "-m", "app.worker"]
+    env_file: .env
+    environment:
+      APP_MODE: full
+      DATABASE_URL: postgresql+psycopg://gateflow:${POSTGRES_PASSWORD}@db:5432/gateflow
+    depends_on:
+      db: {condition: service_healthy}
+    restart: unless-stopped
+    init: true
+volumes:
+  pgdata:

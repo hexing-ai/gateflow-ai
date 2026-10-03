@@ -1,0 +1,25 @@
+{
+  "name": "gateflow-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare-samples": "node scripts/prepare.mjs",
+    "dev": "npm run prepare-samples && vite --host 127.0.0.1",
+    "build": "npm run prepare-samples && tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "parallel_submissions": 4,
+  "unique_runs": 1,
+  "solver_status": "completed",
+  "candidates": 80,
+  "evaluations": 40000,
+  "seconds": 14.53,
+  "zip_bytes": 4501,
+  "cancellation": "cancelled"
+}

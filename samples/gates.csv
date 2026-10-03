@@ -1,0 +1,13 @@
+gate_id,terminal,region,arr_types,dep_types,body_type
+T01,T,North,"D,I","D,I",N
+T02,T,Center,"D,I","D,I",N
+T03,T,South,"D,I","D,I",N
+T04,T,North,"D,I","D,I",N
+T05,T,Center,"D,I","D,I",W
+T06,T,South,"D,I","D,I",W
+S01,S,North,"D,I","D,I",N
+S02,S,Center,"D,I","D,I",N
+S03,S,South,"D,I","D,I",N
+S04,S,North,"D,I","D,I",N
+S05,S,Center,"D,I","D,I",W
+S06,S,South,"D,I","D,I",W
