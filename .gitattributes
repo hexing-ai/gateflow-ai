@@ -1,0 +1,4 @@
+# CSV fixtures deliberately preserve RFC-style CRLF; hashes refer to these bytes.
+*.csv -text whitespace=cr-at-eol
+*.zip binary
+*.png binary
