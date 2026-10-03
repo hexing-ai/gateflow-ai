@@ -1,133 +1,104 @@
 import { useState } from "react";
 import { Plane, ArrowUpRight, Check } from "lucide-react";
 import type { Dataset, Solution, Turn } from "./types";
-import { fmt } from "./api";
+import { base, fmt } from "./api";
 
 export function AirportMap({
   dataset,
   solution,
+  selectedGate,
+  onGate,
 }: {
   dataset: Dataset;
   solution: Solution;
+  selectedGate: string;
+  onGate: (id: string) => void;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
   const used = new Set(Object.values(solution.assignments));
   return (
-    <div
-      className="airport-map"
-      aria-label="T 与 S 航站楼资源示意，非实际机场地图"
-    >
-      <svg
-        viewBox="0 0 560 220"
-        role="img"
-        aria-label={`${used.size - (used.has("UNASSIGNED") ? 1 : 0)} 个固定口被使用`}
-      >
-        <defs>
-          <pattern
-            id="map-grid"
-            width="24"
-            height="24"
-            patternUnits="userSpaceOnUse"
+    <section className="panel resource-panel">
+      <div className="resource-heading">
+        <div>
+          <h2>航站楼资源示意</h2>
+          <span>布局示意 · 非实际机场</span>
+        </div>
+        <div className="resource-legend">
+          <span>
+            <i className="dot blue" />T 厅
+          </span>
+          <span>
+            <i className="dot teal" />S 厅
+          </span>
+          <span className="unused-key">未使用</span>
+          <button
+            className="link-button"
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed(!collapsed)}
           >
-            <path
-              d="M 24 0 L 0 0 0 24"
-              fill="none"
-              stroke="#33516c"
-              strokeWidth=".5"
+            {collapsed ? "展开" : "收起"}
+          </button>
+        </div>
+      </div>
+      {!collapsed && (
+        <>
+          <div
+            className={
+              "terminal-scene" +
+              (["T", "S"].some(
+                (t) => dataset.gates.filter((g) => g.terminal === t).length > 6,
+              )
+                ? " crowded"
+                : "")
+            }
+          >
+            <img
+              src={base + "terminal-apron.jpg"}
+              width="2172"
+              height="724"
+              alt="T 与 S 两座航站楼的建筑示意背景"
             />
-          </pattern>
-        </defs>
-        <rect width="560" height="220" fill="url(#map-grid)" />
-        <path d="M26 181H536M26 188H536" stroke="#37556e" fill="none" />
-        <path d="M40 184H520" stroke="#53718a" strokeDasharray="16 10" />
-        <path
-          d="M254 92h51"
-          stroke="#45647d"
-          strokeWidth="9"
-          strokeDasharray="5 4"
-        />
-        {["T", "S"].map((terminal, side) => {
-          const x = side ? 325 : 55;
-          const gates = dataset.gates
-            .filter((g) => g.terminal === terminal)
-            .slice(0, 12);
-          return (
-            <g key={terminal}>
-              <rect
-                x={x}
-                y="71"
-                width="175"
-                height="46"
-                rx="7"
-                fill={side ? "#174f60" : "#254b6c"}
-                stroke={side ? "#31878b" : "#5585af"}
-              />
-              <text
-                x={x + 87}
-                y="100"
-                textAnchor="middle"
-                fill="#dbebf7"
-                fontSize="14"
-                letterSpacing="3"
-              >
-                {terminal} TERMINAL
-              </text>
-              {gates.map((g, i) => {
-                const upper = i < Math.ceil(gates.length / 2);
-                const col = i % Math.ceil(gates.length / 2);
-                const px =
-                  x +
-                  22 +
-                  col * (130 / Math.max(1, Math.ceil(gates.length / 2) - 1));
-                return (
-                  <g key={g.gate_id}>
-                    <path
-                      d={`M${px} ${upper ? 71 : 117}v${upper ? -20 : 20}`}
-                      stroke={
-                        used.has(g.gate_id)
-                          ? side
-                            ? "#67c9c6"
-                            : "#82b9ec"
-                          : "#46657c"
-                      }
-                      strokeWidth="5"
-                    />
-                    <circle
-                      cx={px}
-                      cy={upper ? 45 : 143}
-                      r="4"
-                      fill={
-                        used.has(g.gate_id)
-                          ? side
-                            ? "#67c9c6"
-                            : "#82b9ec"
-                          : "#46657c"
-                      }
-                    />
-                    <text
-                      x={px}
-                      y={upper ? 29 : 164}
-                      textAnchor="middle"
-                      fontSize="9"
-                      fill="#9cb3c6"
-                    >
-                      {g.gate_id}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
-          );
-        })}
-        <path
-          d="M277 158l7 19 20 6-1 4-20-2-3 13h-4l-3-13-20 2-1-4 20-6z"
-          fill="#b3cddd"
-          transform="rotate(90 277 178)"
-        />
-      </svg>
-      <span className="map-caption">
-        航站楼资源示意 <span>● 已使用 &nbsp; ○ 空闲</span>
-      </span>
-    </div>
+            <div className="terminal-titles">
+              <span>T TERMINAL</span>
+              <span>S TERMINAL</span>
+            </div>
+            <div className="terminal-gates">
+              {["T", "S"].map((terminal) => (
+                <div
+                  key={terminal}
+                  className={"gate-cluster terminal-" + terminal}
+                >
+                  {dataset.gates
+                    .filter((g) => g.terminal === terminal)
+                    .map((g) => (
+                      <button
+                        key={g.gate_id}
+                        className={
+                          "gate-pin " +
+                          (used.has(g.gate_id) ? "used" : "unused") +
+                          (selectedGate === g.gate_id ? " focused" : "")
+                        }
+                        aria-pressed={selectedGate === g.gate_id}
+                        aria-label={`${g.gate_id}，${used.has(g.gate_id) ? "本方案已使用" : "本方案未使用"}，筛选时间轴`}
+                        onClick={() =>
+                          onGate(selectedGate === g.gate_id ? "" : g.gate_id)
+                        }
+                        title={`查看 ${g.gate_id} 占用时间轴`}
+                      >
+                        {g.gate_id}
+                      </button>
+                    ))}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="resource-caption">
+            <span>点击登机口，聚焦占用时间轴</span>
+            <span>按整套方案标记使用状态 · 非实时停靠</span>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 function minute(time: string, day: string) {
@@ -142,15 +113,25 @@ export function Timeline({
   dataset,
   solution,
   onFlight,
+  selectedGate,
+  onClearGate,
+  onDetail,
+  detailLabel,
 }: {
   dataset: Dataset;
   solution: Solution;
   onFlight: (t: Turn) => void;
+  selectedGate: string;
+  onClearGate: () => void;
+  onDetail: () => void;
+  detailLabel: string;
 }) {
   const [terminal, setTerminal] = useState("all");
   const [zoom, setZoom] = useState(false);
-  const gates = dataset.gates.filter(
-    (g) => terminal === "all" || g.terminal === terminal,
+  const gates = dataset.gates.filter((g) =>
+    selectedGate
+      ? g.gate_id === selectedGate
+      : terminal === "all" || g.terminal === terminal,
   );
   const starts = dataset.turnarounds.map((t) =>
     minute(t.arrival_at, dataset.day),
@@ -185,8 +166,12 @@ export function Timeline({
           ].map(([key, label]) => (
             <button
               key={key}
-              className={terminal === key ? "selected" : ""}
-              onClick={() => setTerminal(key)}
+              className={!selectedGate && terminal === key ? "selected" : ""}
+              aria-pressed={!selectedGate && terminal === key}
+              onClick={() => {
+                onClearGate();
+                setTerminal(key);
+              }}
             >
               {label}
             </button>
@@ -194,6 +179,11 @@ export function Timeline({
         </div>
       </div>
       <div className="timeline-legend">
+        {selectedGate && (
+          <button className="gate-filter" onClick={onClearGate}>
+            聚焦 {selectedGate} · 清除 ×
+          </button>
+        )}
         <span>
           <i className="dot blue" />T 厅
         </span>
@@ -294,7 +284,9 @@ export function Timeline({
         <span>
           <Check size={13} /> 已通过本版占用与兼容检查
         </span>
-        <span>当地时间 UTC+8 · {dataset.day}</span>
+        <button className="link-button" onClick={onDetail}>
+          {detailLabel} <ArrowUpRight size={13} />
+        </button>
       </div>
     </section>
   );

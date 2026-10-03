@@ -74,8 +74,11 @@ function App() {
   >("workspace");
   const [currentId, setCurrentId] = useState("");
   const [compared, setCompared] = useState<string[]>([]);
-  const [selectedId, setSelectedId] = useState("");
   const [panel, setPanel] = useState(true);
+  const [insightTab, setInsightTab] = useState<"overview" | "compare">(
+    "overview",
+  );
+  const [gateFocus, setGateFocus] = useState("");
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -183,7 +186,7 @@ function App() {
   }, [isDemo, run?.id, run?.status]);
   useEffect(() => {
     setExplanation(null);
-    setSelectedId("");
+    setGateFocus("");
   }, [currentId, run?.id]);
   useEffect(() => {
     setPreview(null);
@@ -236,6 +239,14 @@ function App() {
   const compareSolutions = compared
     .map((id) => solutions.find((s) => s.id === id))
     .filter((s): s is Solution => !!s);
+  const reference =
+    compareSolutions.find((s) => s.id !== current?.id) ||
+    solutions.find((s) => s.id !== current?.id);
+  const referenceIndex = solutions.findIndex((s) => s.id === reference?.id);
+  const lowerCost =
+    current?.metrics.C != null &&
+    reference?.metrics.C != null &&
+    current.metrics.C < reference.metrics.C;
   const isOwner = session.authenticated && !isDemo;
   const readonly = !session.authenticated;
   function loadDemo() {
@@ -436,6 +447,7 @@ function App() {
       notify("请先勾选至少两套候选方案");
       return;
     }
+    setInsightTab("compare");
     setQuestion(q);
     setChatBusy(true);
     setError("");
@@ -479,7 +491,6 @@ function App() {
           "POST",
           { solution_id: current.id },
         );
-        setSelectedId(current.id);
         const response = await fetch(
           "/api/selections/" + selected.id + "/export",
         );
@@ -544,7 +555,7 @@ function App() {
             <Plane size={23} />
           </span>
           <span>
-            GateFlow<small>登机口分配工作台</small>
+            GateFlow<small>登机口决策工作台</small>
           </span>
         </a>
         <div className="workspace-label">
@@ -702,7 +713,7 @@ function App() {
                     ? "每次运行，都有记录"
                     : page === "details"
                       ? `方案 ${String(index + 1).padStart(2, "0")} · 分配明细`
-                      : "让每一次分配，都有依据。"}
+                      : "登机口方案工作台"}
               </h1>
               <p>
                 {page === "data"
@@ -713,6 +724,10 @@ function App() {
               </p>
             </div>
             <div className="heading-actions">
+              <span className="date-label">
+                <CalendarDays size={16} />
+                {dataset.day.replaceAll("-", " / ")}
+              </span>
               {page === "workspace" || page === "details" ? (
                 <>
                   <button
@@ -725,6 +740,14 @@ function App() {
                       <PanelRightOpen size={16} />
                     )}
                     方案解读
+                  </button>
+                  <button
+                    className="button secondary"
+                    disabled={!current || busy}
+                    onClick={exportCurrent}
+                  >
+                    <Download size={16} />
+                    {isDemo ? "导出样例" : "选用并导出"}
                   </button>
                   <button
                     className="button primary"
@@ -1231,56 +1254,6 @@ function App() {
             </section>
           ) : (
             <>
-              <section className="operation-banner">
-                <div className="operation-copy">
-                  <div className="live-caption">
-                    <span className="pulse-dot" />
-                    {isDemo ? "SYNTHETIC OPERATION DAY" : "ANALYSIS SNAPSHOT"}
-                  </div>
-                  <h2>
-                    {dataset.day.replaceAll("-", " / ")}
-                    <span>运行日</span>
-                  </h2>
-                  <p>连接航班与旅客，找到更合适的分配。</p>
-                  <div className="operation-tags">
-                    <span>
-                      <Plane size={13} />
-                      {dataset.turnarounds.length} 条飞机周转
-                    </span>
-                    <span>
-                      <Database size={13} />
-                      {dataset.gates.length} 个固定口
-                    </span>
-                    <span>
-                      <Check size={13} />
-                      {dataset.rules.version}
-                    </span>
-                  </div>
-                </div>
-                <AirportMap dataset={dataset} solution={current} />
-              </section>
-              <div className="scope-strip">
-                <span>
-                  <CalendarDays size={14} />
-                  {dataset.day}
-                </span>
-                <span>
-                  <SlidersHorizontal size={14} />
-                  {run?.config.mode === "resource"
-                    ? "资源分配模式"
-                    : "中转流程成本模式"}
-                </span>
-                <span>
-                  <ShieldCheck size={14} />
-                  客流覆盖 {dataset.coverage.matched}/{dataset.coverage.total}{" "}
-                  人
-                </span>
-                <span className="scope-note">
-                  {isDemo
-                    ? "合成数据 · 预计算结果"
-                    : "历史数据分析 · 非生产指令"}
-                </span>
-              </div>
               <div className="metric-grid">
                 {[
                   {
@@ -1301,8 +1274,8 @@ function App() {
                   },
                   {
                     label: "使用固定口",
-                    value: fmt(current.metrics.G),
-                    unit: "个",
+                    value: `${fmt(current.metrics.G)} / ${dataset.gates.length}`,
+                    unit: "",
                     note: `共 ${dataset.gates.length} 个可用固定口`,
                     Icon: LayoutDashboard,
                     color: "teal",
@@ -1316,7 +1289,7 @@ function App() {
                     color: "blue",
                   },
                 ].map(({ label, value, unit, note, Icon, color }) => (
-                  <div className="metric-card" key={label}>
+                  <div className={"metric-card metric-" + color} key={label}>
                     <div className="metric-label">
                       {label}
                       <span className={"metric-icon " + color}>
@@ -1335,49 +1308,67 @@ function App() {
                 className={"workspace-grid " + (!panel ? "panel-hidden" : "")}
               >
                 <div className="workspace-main">
-                  <div className="current-bar">
-                    <div>
-                      <span className="plan-marker">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <strong>
-                        当前查看：方案 {String(index + 1).padStart(2, "0")}
-                      </strong>
-                      <span className="tag success">
-                        <Check size={12} />
-                        校验通过
-                      </span>
-                    </div>
-                    <div>
+                  <div className="scheme-toolbar">
+                    <div className="scheme-tabs" aria-label="候选方案切换">
+                      {solutions.slice(0, 3).map((s, i) => (
+                        <button
+                          key={s.id}
+                          aria-pressed={s.id === current.id}
+                          className={s.id === current.id ? "active" : ""}
+                          onClick={() => choose(s)}
+                        >
+                          方案 {String(i + 1).padStart(2, "0")}
+                        </button>
+                      ))}
+                      {index >= 3 && (
+                        <button className="active" aria-pressed="true">
+                          方案 {String(index + 1).padStart(2, "0")}
+                        </button>
+                      )}
                       <button
-                        className="link-button"
-                        onClick={() =>
-                          page === "details"
-                            ? setPage("workspace")
-                            : showDetail()
-                        }
+                        className="all-schemes"
+                        onClick={() => {
+                          setPage("workspace");
+                          setTimeout(
+                            () =>
+                              document
+                                .getElementById("candidates")
+                                ?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "center",
+                                }),
+                            0,
+                          );
+                        }}
                       >
-                        {page === "details" ? "返回工作台" : "查看明细"}{" "}
-                        <ArrowUpRight size={14} />
-                      </button>
-                      <button
-                        className="button secondary small"
-                        disabled={busy}
-                        onClick={exportCurrent}
-                      >
-                        <Download size={14} />
-                        {isDemo
-                          ? "下载样例"
-                          : selectedId === current.id
-                            ? "再次导出"
-                            : "选用并导出"}
+                        全部 {solutions.length} 个方案 <ArrowRight size={13} />
                       </button>
                     </div>
+                    <span className="validated">
+                      <ShieldCheck size={16} />
+                      校验通过
+                    </span>
                   </div>
+                  <AirportMap
+                    dataset={dataset}
+                    solution={current}
+                    selectedGate={gateFocus}
+                    onGate={setGateFocus}
+                  />
                   <Timeline
                     dataset={dataset}
                     solution={current}
                     onFlight={setFlight}
+                    selectedGate={gateFocus}
+                    onClearGate={() => setGateFocus("")}
+                    onDetail={() =>
+                      page === "details"
+                        ? setPage("workspace")
+                        : void showDetail()
+                    }
+                    detailLabel={
+                      page === "details" ? "返回工作台" : "查看分配明细"
+                    }
                   />
                   {page === "details" ? (
                     <>
@@ -1488,7 +1479,7 @@ function App() {
                       </section>
                     </>
                   ) : (
-                    <div className="candidate-layout">
+                    <div className="candidate-layout" id="candidates">
                       <section className="panel candidates-panel">
                         <div className="panel-head">
                           <div>
@@ -1628,186 +1619,301 @@ function App() {
                       </button>
                     </div>
                     <div className="insight-body">
-                      <div className="assistant-intro">
-                        <h3>看懂数字背后的取舍</h3>
-                        <p>从完整方案出发，比较资源、覆盖和中转流程成本。</p>
+                      <div className="insight-tabs" aria-label="方案解读视图">
+                        <button
+                          className={insightTab === "overview" ? "active" : ""}
+                          aria-pressed={insightTab === "overview"}
+                          onClick={() => setInsightTab("overview")}
+                        >
+                          概览
+                        </button>
+                        <button
+                          className={insightTab === "compare" ? "active" : ""}
+                          aria-pressed={insightTab === "compare"}
+                          onClick={() => setInsightTab("compare")}
+                        >
+                          方案比较
+                        </button>
                       </div>
-                      <div className="evidence-status">
-                        <ShieldCheck size={16} />
-                        <span>
-                          当前方案已通过独立校验
-                          <small>
-                            方案 {String(index + 1).padStart(2, "0")} ·{" "}
-                            {current.id.slice(0, 8)}
-                          </small>
-                        </span>
-                      </div>
-                      <div className="insight-stat">
-                        <span>模型未满足中转条件</span>
-                        <strong>
-                          {fmt(current.metrics.unmet_passengers)}{" "}
-                          <small>人</small>
-                        </strong>
-                        <p>
-                          包含未分配固定口或衔接时间不足；不是实际误机人数。
-                        </p>
-                      </div>
-                      <div className="insight-stat">
-                        <span>满足条件组平均流程时间</span>
-                        <strong>
-                          {fmt(current.metrics.average_process_minutes)}{" "}
-                          <small>分钟</small>
-                        </strong>
-                        <p>按人数加权，仅统计满足条件的组。</p>
-                      </div>
-                      <div className="insight-divider" />
-                      <div className="question-label">
-                        比较已勾选的 {compared.length} 套方案
-                      </div>
-                      <div className="quick-questions">
-                        {[
-                          "哪套方案的中转成本更低？",
-                          "少用登机口，需要付出什么代价？",
-                        ].map((q) => (
+                      {insightTab === "overview" ? (
+                        <>
+                          <div className="assistant-intro">
+                            <span className="scheme-pill">
+                              方案 {String(index + 1).padStart(2, "0")}
+                            </span>
+                            <h3>
+                              {lowerCost
+                                ? "更低的中转流程成本"
+                                : "看清当前方案的取舍"}
+                            </h3>
+                            <p>
+                              {reference
+                                ? `与方案 ${String(referenceIndex + 1).padStart(2, "0")} 比较，结合固定口使用、分配覆盖与中转成本作出选择。`
+                                : "查看分配覆盖、资源使用和中转流程成本。"}
+                            </p>
+                          </div>
+                          <div className="overview-stats">
+                            <div>
+                              <span>模型未满足中转条件</span>
+                              <strong>
+                                {fmt(current.metrics.unmet_passengers)}
+                                <small>人</small>
+                              </strong>
+                            </div>
+                            <div>
+                              <span>满足条件组平均流程</span>
+                              <strong>
+                                {fmt(current.metrics.average_process_minutes)}
+                                <small>分钟</small>
+                              </strong>
+                            </div>
+                            <div>
+                              <span>客流覆盖</span>
+                              <strong>
+                                {fmt(dataset.coverage.matched)}
+                                <small>人</small>
+                              </strong>
+                            </div>
+                          </div>
+                          {reference && (
+                            <div className="comparison-summary">
+                              <h3>
+                                与方案{" "}
+                                {String(referenceIndex + 1).padStart(2, "0")}{" "}
+                                相比
+                              </h3>
+                              {(
+                                [
+                                  ["U", "未安排固定口", "条"],
+                                  ["G", "使用固定口", "个"],
+                                  ["C", "中转流程成本", "人·分钟"],
+                                  ["unmet_passengers", "模型未满足人数", "人"],
+                                ] as const
+                              ).map(([key, label, unit]) => {
+                                const value = current.metrics[key],
+                                  before = reference.metrics[key];
+                                const delta =
+                                  value == null || before == null
+                                    ? null
+                                    : value - before;
+                                return (
+                                  <div className="comparison-row" key={key}>
+                                    <span>{label}</span>
+                                    <strong
+                                      className={
+                                        delta != null && delta < 0
+                                          ? "positive"
+                                          : ""
+                                      }
+                                    >
+                                      {delta != null && delta > 0 ? "+" : ""}
+                                      {fmt(delta)}
+                                      <small>{unit}</small>
+                                    </strong>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <p className="model-caution">
+                            <Info size={14} />
+                            模型指标不等于实际误机人数
+                          </p>
+                          <div className="evidence-link">
+                            <span>
+                              <ShieldCheck size={16} />
+                              独立校验通过
+                            </span>
+                            <button
+                              className="link-button"
+                              onClick={showDetail}
+                            >
+                              查看计算依据 <ArrowRight size={13} />
+                            </button>
+                          </div>
                           <button
-                            key={q}
-                            onClick={() => explain(q)}
-                            disabled={chatBusy}
+                            className="button secondary wide compare-all"
+                            onClick={() => {
+                              setPage("workspace");
+                              setTimeout(
+                                () =>
+                                  document
+                                    .getElementById("candidates")
+                                    ?.scrollIntoView({
+                                      behavior: "smooth",
+                                      block: "center",
+                                    }),
+                                0,
+                              );
+                            }}
                           >
-                            {q}
-                            <ArrowUpRight size={13} />
+                            比较全部方案 <ArrowRight size={15} />
                           </button>
-                        ))}
-                      </div>
-                      {explanation && (
-                        <div className="answer" aria-live="polite">
-                          <span className="answer-label">
-                            <Sparkles size={12} />
-                            {explanation.source === "template"
-                              ? "确定性差异摘要"
-                              : "AI 证据摘要"}
-                          </span>
-                          <p>{explanation.summary}</p>
-                          <div className="delta-cards">
-                            {explanation.cards.map((c) => (
+                          <button
+                            className="why-button"
+                            disabled={compared.length < 2}
+                            onClick={() => explain("解释这些方案的取舍")}
+                          >
+                            <Sparkles size={16} />
+                            这些方案有什么取舍？
+                            <ChevronRight size={15} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="question-label">
+                            比较已勾选的 {compared.length} 套方案
+                          </div>
+                          <div className="quick-questions">
+                            {[
+                              "哪套方案的中转成本更低？",
+                              "少用登机口，需要付出什么代价？",
+                            ].map((q) => (
                               <button
-                                key={c.id}
-                                onClick={() => {
-                                  const s = solutions.find(
-                                    (s) => s.id === c.solution_id,
-                                  );
-                                  if (s) choose(s);
-                                }}
+                                key={q}
+                                onClick={() => explain(q)}
+                                disabled={chatBusy}
                               >
-                                <span>
-                                  {metricNames[c.metric]}
-                                  <small>
-                                    方案{" "}
-                                    {String(
-                                      solutions.findIndex(
-                                        (s) => s.id === c.solution_id,
-                                      ) + 1,
-                                    ).padStart(2, "0")}{" "}
-                                    相对基准
-                                  </small>
-                                </span>
-                                <b
-                                  className={
-                                    c.delta < 0
-                                      ? "positive"
-                                      : c.delta > 0
-                                        ? "negative"
-                                        : ""
-                                  }
-                                >
-                                  {c.delta > 0 ? "+" : ""}
-                                  {fmt(c.delta)}
-                                </b>
+                                {q}
+                                <ArrowUpRight size={13} />
                               </button>
                             ))}
                           </div>
-                          {explanation.changes?.map((changes, i) => (
-                            <details className="contributions" key={i}>
-                              <summary>
-                                方案{" "}
-                                {String(
-                                  solutions.findIndex(
-                                    (s) => s.id === compareSolutions[i + 1]?.id,
-                                  ) + 1,
-                                ).padStart(2, "0")}{" "}
-                                · {changes.length} 组路径变化
-                              </summary>
-                              {changes.map((change) => (
-                                <div key={change.group_id}>
-                                  <strong>
-                                    {change.group_id} · {change.passengers} 人{" "}
+                          {explanation && (
+                            <div className="answer" aria-live="polite">
+                              <span className="answer-label">
+                                <Sparkles size={12} />
+                                {explanation.source === "template"
+                                  ? "确定性差异摘要"
+                                  : "AI 证据摘要"}
+                              </span>
+                              <p>{explanation.summary}</p>
+                              <div className="delta-cards">
+                                {explanation.cards.map((c) => (
+                                  <button
+                                    key={c.id}
+                                    onClick={() => {
+                                      const s = solutions.find(
+                                        (s) => s.id === c.solution_id,
+                                      );
+                                      if (s) choose(s);
+                                    }}
+                                  >
+                                    <span>
+                                      {metricNames[c.metric]}
+                                      <small>
+                                        方案{" "}
+                                        {String(
+                                          solutions.findIndex(
+                                            (s) => s.id === c.solution_id,
+                                          ) + 1,
+                                        ).padStart(2, "0")}{" "}
+                                        相对基准
+                                      </small>
+                                    </span>
                                     <b
                                       className={
-                                        change.delta < 0
+                                        c.delta < 0
                                           ? "positive"
-                                          : change.delta > 0
+                                          : c.delta > 0
                                             ? "negative"
                                             : ""
                                       }
                                     >
-                                      {change.delta > 0 ? "+" : ""}
-                                      {fmt(change.delta)}
+                                      {c.delta > 0 ? "+" : ""}
+                                      {fmt(c.delta)}
                                     </b>
-                                  </strong>
-                                  <span>
-                                    {change.from} → {change.to}
-                                  </span>
-                                  <span>
-                                    {fmt(change.before)} → {fmt(change.after)}{" "}
-                                    人·分钟
-                                  </span>
-                                </div>
+                                  </button>
+                                ))}
+                              </div>
+                              {explanation.changes?.map((changes, i) => (
+                                <details className="contributions" key={i}>
+                                  <summary>
+                                    方案{" "}
+                                    {String(
+                                      solutions.findIndex(
+                                        (s) =>
+                                          s.id === compareSolutions[i + 1]?.id,
+                                      ) + 1,
+                                    ).padStart(2, "0")}{" "}
+                                    · {changes.length} 组路径变化
+                                  </summary>
+                                  {changes.map((change) => (
+                                    <div key={change.group_id}>
+                                      <strong>
+                                        {change.group_id} · {change.passengers}{" "}
+                                        人{" "}
+                                        <b
+                                          className={
+                                            change.delta < 0
+                                              ? "positive"
+                                              : change.delta > 0
+                                                ? "negative"
+                                                : ""
+                                          }
+                                        >
+                                          {change.delta > 0 ? "+" : ""}
+                                          {fmt(change.delta)}
+                                        </b>
+                                      </strong>
+                                      <span>
+                                        {change.from} → {change.to}
+                                      </span>
+                                      <span>
+                                        {fmt(change.before)} →{" "}
+                                        {fmt(change.after)} 人·分钟
+                                      </span>
+                                    </div>
+                                  ))}
+                                </details>
                               ))}
-                            </details>
-                          ))}
-                          <p className="answer-boundary">
-                            {explanation.boundary}
-                          </p>
-                        </div>
+                              <p className="answer-boundary">
+                                {explanation.boundary}
+                              </p>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
-                    <form
-                      className="ask-form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        explain();
-                      }}
-                    >
-                      <div className="ask-input">
-                        <textarea
-                          value={question}
-                          onChange={(e) => setQuestion(e.target.value)}
-                          placeholder={
-                            isDemo
-                              ? "输入问题，查看方案差异摘要…"
-                              : "询问当前方案的取舍…"
-                          }
-                          maxLength={2000}
-                          aria-label="方案解读问题"
-                        />
-                        <button
-                          className="send-button"
-                          disabled={chatBusy || compared.length < 2}
-                          aria-label="发送方案解读问题"
-                        >
-                          {chatBusy ? (
-                            <LoaderCircle size={16} className="spin" />
-                          ) : (
-                            <ArrowRight size={18} />
-                          )}
-                        </button>
-                      </div>
-                      <p>
-                        {isDemo
-                          ? "演示不调用外部模型，数字来自样例计算"
-                          : "数字由程序计算，AI 不直接修改分配"}
-                      </p>
-                    </form>
+                    {insightTab === "compare" && (
+                      <form
+                        className="ask-form"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          explain();
+                        }}
+                      >
+                        <div className="ask-input">
+                          <textarea
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            placeholder={
+                              isDemo
+                                ? "输入问题，查看方案差异摘要…"
+                                : "询问当前方案的取舍…"
+                            }
+                            maxLength={2000}
+                            aria-label="方案解读问题"
+                          />
+                          <button
+                            className="send-button"
+                            disabled={chatBusy || compared.length < 2}
+                            aria-label="发送方案解读问题"
+                          >
+                            {chatBusy ? (
+                              <LoaderCircle size={16} className="spin" />
+                            ) : (
+                              <ArrowRight size={18} />
+                            )}
+                          </button>
+                        </div>
+                        <p>
+                          {isDemo
+                            ? "演示不调用外部模型，数字来自样例计算"
+                            : "数字由程序计算，AI 不直接修改分配"}
+                        </p>
+                      </form>
+                    )}
                   </aside>
                 )}
               </div>

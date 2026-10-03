@@ -6,6 +6,15 @@
 
 公开构建仅含合成 CSV、预计算结果和证据包。部署使用 GitHub Actions OIDC；无需把个人 GitHub token 写进仓库。
 
+在 macOS / Linux 本地复核 Pages 构建时，构建与预览都要使用相同子路径：
+
+```bash
+VITE_DEMO_ONLY=true VITE_BASE_PATH=/gateflow-ai/ npm run build --prefix web
+VITE_BASE_PATH=/gateflow-ai/ npm run preview --prefix web
+```
+
+访问终端所示端口下的 `/gateflow-ai/`。普通本地体验直接运行 README 中的 `npm run demo --prefix web`，无需设置子路径。
+
 ## 完整应用：Compose
 
 1. 按 README 初始化 `.env`，不要提交该文件。
@@ -30,3 +39,45 @@
 - 研究矩阵与实际机场规则的适用性。
 
 这些检查不是公开只读样例的运行依赖，也不应由演示结果替代。
+
+## 配置项与本地运行检查
+
+建议用 `scripts/create_env.py` 生成完整 `.env`，不要把 `.env.example` 中的占位符直接用于部署。
+
+| 配置 | 用途 |
+| --- | --- |
+| `POSTGRES_PASSWORD` | Compose 数据库密码；初始化脚本生成随机值 |
+| `AUTH_SECRET` | 登录会话签名；初始化脚本生成 |
+| `OWNER_PASSWORD_HASH` | Argon2 密码摘要；脚本交互生成，保留引号以免 Compose 解释 `$` |
+| `PUBLIC_ORIGIN` | 浏览器实际来源，包括协议和端口 |
+| `COOKIE_SECURE` | 本地 HTTP 为 false，生产 HTTPS 为 true |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` / `LLM_PROVIDER` | 可选服务端模型配置 |
+
+Compose 中 API 与 worker 的 `DATABASE_URL` 根据数据库密码生成；不需要自行将数据库开放到公网。
+
+```bash
+docker compose ps
+curl http://localhost:8000/api/health
+docker compose logs --tail=100 api worker
+```
+
+当健康检查返回成功后，访问首页并登录。用 `samples/gates.csv`、`samples/turnarounds.csv` 和 `samples/transfers.csv`，选择 `2026-10-03` 走通一次分析。演示模式不接受上传；只有完整后端且登录后开放私人数据功能。
+
+停止服务但保留数据：
+
+```bash
+docker compose down
+```
+
+不要在需要保留数据时添加 `-v`。数据库卷的备份应通过 PostgreSQL 工具完成，并在目标环境验证恢复流程。
+
+## 常见启动问题
+
+- **本地只想看界面**：执行 `npm run demo --prefix web`。`npm run dev` 面向完整开发，会尝试连接本机 API。
+- **Node.js 版本不兼容**：使用 Node.js 22，再执行 `npm ci --prefix web`。
+- **Vite 端口被占用**：以终端输出地址为准，或用 `npm run demo --prefix web -- --port 5178` 指定端口。
+- **完整应用登录失败**：确认 `PUBLIC_ORIGIN` 与访问地址一致；localhost 与 127.0.0.1 是不同来源。本地 HTTP 使用 `COOKIE_SECURE=false`。
+- **任务长时间排队**：检查 worker 日志与数据库连接；仅 API 启动不能执行后台计算。
+- **模型未启用**：检查服务端环境配置并由所有者在设置中确认发送范围；表单分析不依赖模型。
+
+本仓库提供容器配置；本机未提供 Docker daemon，因此并未以本机运行结果声称目标云环境已完成容器验收。后端模块和真实 PostgreSQL 开发链路的执行记录见 [验证记录](VALIDATION.md)。

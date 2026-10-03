@@ -1,6 +1,7 @@
 .venv/
 .env*
 !.env.example
+!web/.env.demo
 .local/
 __pycache__/
 .pytest_cache/

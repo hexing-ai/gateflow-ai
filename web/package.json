@@ -6,6 +6,7 @@
   "scripts": {
     "prepare-samples": "node scripts/prepare.mjs",
     "dev": "npm run prepare-samples && vite --host 127.0.0.1",
+    "demo": "npm run prepare-samples && vite --mode demo --host 127.0.0.1",
     "build": "npm run prepare-samples && tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1"
   },
