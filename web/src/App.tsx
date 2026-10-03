@@ -51,7 +51,7 @@ import type {
 import { api, base, staticOnly, fmt, percent, statusName } from "./api";
 import { AirportMap, Timeline, Pareto } from "./charts";
 
-const repo = "https://github.com/junz11055-hue/gateflow-ai";
+const repo = "https://github.com/hexing-ai/gateflow-ai";
 const activeStates = ["queued", "running", "validating", "cancelling"];
 const metricNames: Record<string, string> = {
   U: "未安排固定口",

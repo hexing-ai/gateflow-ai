@@ -2,7 +2,7 @@
 
 用可视化看清登机口分配中的资源与中转成本取舍。优化器生成候选方案，独立检查器复核约束，用户比较并选用方案；AI 接入负责受约束的配置建议与证据组织。
 
-**[访问在线演示](https://junz11055-hue.github.io/gateflow-ai/)** · [产品需求](docs/PRD.md) · [部署说明](docs/DEPLOYMENT.md) · [验证记录](docs/VALIDATION.md)
+**[访问在线演示](https://hexing-ai.github.io/gateflow-ai/)** · [产品需求](docs/PRD.md) · [部署说明](docs/DEPLOYMENT.md) · [验证记录](docs/VALIDATION.md)
 
 ![GateFlow 工作台](docs/workspace.png)
 
